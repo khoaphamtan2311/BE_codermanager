@@ -1,6 +1,6 @@
 const { sendResponse, AppError } = require("../helpers/utils.js");
-
-const { User } = require("../models/Schema.js");
+const { default: mongoose } = require("mongoose");
+const User = require("../models/User.js");
 
 // createUser,
 // getUsers,
@@ -12,9 +12,7 @@ userController.createUser = async (req, res, next) => {
   try {
     const info = req.body;
     if (!info) throw new AppError(402, "Bad Request", "Create user Error");
-    if (!info.role) {
-      info.role = "employee";
-    }
+    if (!info.name) throw new AppError(410, "Bad Request", "Missing Name");
     const created = await User.create(info);
     sendResponse(
       res,
@@ -35,13 +33,12 @@ userController.getUsers = async (req, res, next) => {
   let newFilter = {};
 
   try {
-    if (Object.keys(req.query).lengths > 0) {
+    if (Object.keys(req.query).length > 0) {
       const query = req.query;
       var checkFilter = Object.keys(query);
       const checkedFilter = checkFilter.filter((filter) =>
         allowedFilter.includes(filter)
       );
-      console.log(checkedFilter);
       if (checkedFilter.length === 0) {
         throw new AppError(402, "Bad Request", "Invalid Query");
       }
@@ -89,6 +86,9 @@ userController.searchUser = async (req, res, next) => {
 userController.getUserTask = async (req, res, next) => {
   const id = req.params.id;
   try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new AppError(420, "Bad Request", "Invalid ID");
+    }
     const found = await User.findById(id).populate("task");
     sendResponse(
       res,

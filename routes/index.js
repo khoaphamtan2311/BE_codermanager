@@ -1,7 +1,7 @@
 var express = require("express");
 var router = express.Router();
 const { sendResponse, AppError } = require("../helpers/utils.js");
-const { User } = require("../models/Schema.js");
+const { User } = require("../models/Task.js");
 
 /* GET home page. */
 router.get("/", function (req, res, next) {

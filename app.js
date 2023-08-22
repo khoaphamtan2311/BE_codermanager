@@ -24,7 +24,6 @@ const mongoose = require("mongoose");
 const mongoURI =
   process.env.MONGODB_URI ||
   "mongodb+srv://admin:admin@cluster0.ln6pbuw.mongodb.net/manager";
-console.log(mongoURI);
 
 mongoose
   .connect(mongoURI)

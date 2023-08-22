@@ -1,7 +1,8 @@
+const { default: mongoose } = require("mongoose");
 const { sendResponse, AppError } = require("../helpers/utils.js");
 
-const { Task } = require("../models/Schema.js");
-const { User } = require("../models/Schema.js");
+const Task = require("../models/Task.js");
+const User = require("../models/User.js");
 
 const taskController = {};
 
@@ -11,15 +12,13 @@ taskController.createTask = async (req, res, next) => {
   try {
     const info = req.body;
     if (!info) throw new AppError(402, "Bad Request", "Create task Error");
-    if (!info.status) {
-      info.status = "pending";
+    if (!info.name || !info.description) {
+      throw new AppError(402, "Bad Request", "Missing name and/or description");
     }
-    const created = await Task.create(info).populate("asignee");
+    const created = await Task.create(info);
     let callUser;
     if (info.asignee) {
-      console.log(info.asignee);
       const getUser = await User.findById(info.asignee);
-      console.log(getUser);
       const taskUpdate = [...getUser?.task, created._id];
       callUser = await User.findByIdAndUpdate(
         info.asignee,
@@ -43,12 +42,29 @@ taskController.createTask = async (req, res, next) => {
 };
 //get Task with filter
 taskController.getTask = async (req, res, next) => {
-  const allowedFilter = ["name", "status", "createdAt", "updatedAt", "status"];
+  const allowedFilter = ["name", "status", "status"];
   let newFilter = {};
   const isDeleted = { isDeleting: false };
+  let sort = {};
   try {
-    if (Object.keys(req.query).lengths > 0) {
-      const query = req.query;
+    const query = req.query;
+    if (query.sortByCreatedDay || query.sortByUpdatedDay) {
+      if (query.sortByCreatedDay === "1") {
+        sort = { createdAt: 1 };
+      }
+      if (query.sortByCreatedDay === "-1") {
+        sort = { createdAt: -1 };
+      }
+      if (query.sortByUpdatedDay === "1") {
+        sort = { updatedAt: 1 };
+      }
+      if (query.sortByUpdatedDay === "-1") {
+        sort = { updatedAt: -1 };
+      }
+      delete query.sortByCreatedDay;
+      delete query.sortByUpdatedDay;
+    }
+    if (Object.keys(query).length > 0) {
       var checkFilter = Object.keys(query);
       const checkedFilter = checkFilter.filter((filter) =>
         allowedFilter.includes(filter)
@@ -63,7 +79,9 @@ taskController.getTask = async (req, res, next) => {
       newFilter = replacedFilters.reduce((a, b) => Object.assign({}, a, b));
     }
     const filteredField = Object.assign(newFilter, isDeleted);
-    const listOfFound = await Task.find(filteredField).populate("asignee");
+    const listOfFound = await Task.find(filteredField)
+      .sort(sort)
+      .populate("asignee");
     if (listOfFound.length === 0) {
       sendResponse(res, 200, true, null, "Couldn't find task ");
     }
@@ -85,6 +103,9 @@ taskController.getTaskById = async (req, res, next) => {
   const id = req.params.id;
 
   try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new AppError(420, "Bad Request", "Invalid ID");
+    }
     const found = await Task.find({ _id: id, isDeleting: false });
     if (found.length === 0) {
       sendResponse(res, 200, true, null, "Couldn't find task ");
@@ -107,6 +128,10 @@ taskController.assignTask = async (req, res, next) => {
   const taskId = req.body.taskId;
   const options = { new: true };
   try {
+    const findUser = await User.findById(_id);
+    if (findUser.length === 0) {
+      throw new AppError(410, "Bad Request", "Cannot find User");
+    }
     const found = await User.findById(_id);
     if (found.task.includes(taskId)) {
       throw new AppError(402, "Bad Request", "Already assigned to this user");
@@ -127,7 +152,6 @@ taskController.assignTask = async (req, res, next) => {
         { task: [] },
         options
       );
-      console.log(deleteTaskInOldUser);
     }
     const updateInTask = await Task.findByIdAndUpdate(
       taskId,
@@ -153,8 +177,11 @@ taskController.updateStatus = async (req, res, next) => {
   const taskStatus = req.body;
   const options = { new: true };
   try {
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      throw new AppError(420, "Bad Request", "Invalid ID");
+    }
     const checking = await Task.findById(taskId);
-    console.log(checking);
+
     if (checking.status === "done" && taskStatus.status !== "archive") {
       throw new AppError(
         402,
@@ -189,17 +216,20 @@ taskController.deleteTask = async (req, res, next) => {
   const options = { new: true };
   const softDelete = { isDeleting: true };
   try {
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      throw new AppError(420, "Bad Request", "Invalid ID");
+    }
     const updated = await Task.findByIdAndUpdate(taskId, softDelete, options);
-    console.log("updated", updated);
+
     const getUser = await User.findOne({ task: taskId });
     const newTask = getUser.task.filter((el) => !el.equals(taskId));
-    console.log(newTask);
+
     const updateUser = await User.findOneAndUpdate(
       { _id: getUser._id },
       { task: newTask },
       options
     );
-    console.log(updateUser);
+
     sendResponse(
       res,
       200,
