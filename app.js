@@ -21,7 +21,9 @@ app.use(cors());
 
 const mongoose = require("mongoose");
 /* DB connection*/
-const mongoURI = process.env.MONGODB_URI || "mongodb://127.0.0.1/manager";
+const mongoURI =
+  process.env.MONGODB_URI ||
+  "mongodb+srv://admin:admin@cluster0.ln6pbuw.mongodb.net/manager";
 console.log(mongoURI);
 
 mongoose
